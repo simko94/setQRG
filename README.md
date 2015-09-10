@@ -28,4 +28,4 @@ Das Programm ist aktuell dafür ausgelegt, jeweils 2 PLL-ICs (Rx und Tx) zu besc
 
 **--sw2_tx** : SW2 vom TX-IC
 
-Die Pins, die zur Ansteuerung der Rx und Tx PLL-ICs genutzt werden, werden im jeweiligen Treibermodul angegeben, im jetztigen Fall ist es **qrg_odroid_gpio.py **
+Die Pins, die zur Ansteuerung der Rx und Tx PLL-ICs genutzt werden, werden im jeweiligen Treibermodul angegeben, im jetztigen Fall ist es **qrg_odroid_gpio.py**
