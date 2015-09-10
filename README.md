@@ -16,11 +16,16 @@ Wird das Programm ohne parameter aufgerufen, werden die zuletzt gespeicherten Da
 
 Das Programm ist aktuell dafür ausgelegt, jeweils 2 PLL-ICs (Rx und Tx) zu beschreiben. Deshalb können insgesamt 6 Werte angegeben werden:
 
-** --rx ** : Empfangsfrequenz
-** --tx ** : Sendefrequenz
-** --sw1_rx ** : SW1 vom RX-IC
-** --sw2_rx ** : SW2 vom RX-IC
-** --sw1_tx ** : SW1 vom TX-IC
-** --sw2_tx ** : SW2 vom TX-IC
+**--rx** : Empfangsfrequenz
+
+**--tx** : Sendefrequenz
+
+**--sw1_rx** : SW1 vom RX-IC
+
+**--sw2_rx** : SW2 vom RX-IC
+
+**--sw1_tx** : SW1 vom TX-IC
+
+**--sw2_tx** : SW2 vom TX-IC
 
 Die Pins, die zur Ansteuerung der Rx und Tx PLL-ICs genutzt werden, werden im jeweiligen Treibermodul angegeben, im jetztigen Fall ist es **qrg_odroid_gpio.py **
