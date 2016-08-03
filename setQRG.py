@@ -1,9 +1,9 @@
-##
+###
 #
 #	Copyright (c) 2015, Simon Kofler, IN3FQQ
 #	
 #	QRG-Steuerung fuer Motorola PLL Frequency Synthesizer MC145156
-#	im Italtel MB-45
+#	im Italtel MB-45 und MC145158 im Motorola MC Compact
 #
 #    setQRG is free software: you can redistribute it and/or modify
 #    it under the terms of the GNU General Public License as published by
@@ -41,14 +41,23 @@ import qrg_odroid_gpio as interface	# Hier kann das verwendete Interface gewechs
 
 ### Datei, in welcher die Parameter abgelegt werden
 QRGPARAMS = "/opt/qrgparams"
+## Hier wird das PLL-Modell definiert
+# Erlaubte werte sind mc145158 und mc145156
 
-### Referenzfrequenz des PLL in KHz
+PLL_IC = "mc145158"
+
+### Referenzfrequenz des PLL in kHz
 REF_PLL = 12.5
-### Prescaler, welcher auf dem ITALTEL-Funkgeraet verwendet wird
-PRESCALER = 64
-### Zwischenfrequenz in KHz
+# Referenzquarz in kHz
+REF_QUARZ = 14400
+### Prescaler
+PRESCALER = 40
+### Zwischenfrequenz in kHz
 ZF = 21400
 
+
+def calculateRval(ref_pll):
+	return int(REF_QUARZ / ref_pll)
 
 # Berechnet den N-Wert fuer eine gegebene Frequenz (QRG) und gegebene PLL-Referenzfrequenz sowie gegebenem Prescaler
 def calculateNval(qrg,ref_pll,prescaler):
@@ -85,18 +94,31 @@ def bitfield7(n):
 			ret = [0] + ret
 	return ret
 
+# Gibt die immer 14 Bit lange binaere Form des Integers n zurueck, wobei bei Bedarf 
+# fuehrende Nullen hinzugefuegt werden
+def bitfield14(n):
+	ret = bitfield(n)
+	length = len(ret)
+	if length < 14:
+		for i in range(14-length):
+			ret = [0] + ret
+	return ret
+
+
 ##
 #
 # Hauptprogramm
 # 
-# Das Skript nimmt zwei Kommandozeilenargumente, RX und TX (Frequenz in KHz!)
-# und berechnet die noetigen N- und A-Counter-Bits fuer den MC145156
-#
-# Das Datenformat sieht folgendermassen aus:
+# Der MC145156 wird durch ein einzelnes, 19 bit langes Datenwort konfiguriert.
+# Das Datenformat beim MC145156 sieht folgendermassen aus:
 #
 #	Serielle Uebertragung, 19 Bit, N und A-Counter werden stets mit dem MSB beginnend seriell uebertragen!
 #
 #	SW1 | SW2 | N[0] | N[1] | ... | N[9] | A[0] | A[1] | .. | A[6]
+#
+#
+# Beim MC145158 muss der Teiler der Referenzfrequenz ueber ein eigenes, 14 bit langes Datenwort konfiguriert werden.
+# Das A/N-Datenwort entspricht beim MC145158 im Wesentlichen dem des MC145156. Es fehlen lediglich die beiden Bits fuer SW1 und SW2 zu Beginn.
 #
 #
 ##
@@ -114,13 +136,17 @@ Copyright (C) 2015, Simon Kofler, IN3FQQ
 Licence: GPLv3''',prog="setQRG")
 parser.add_argument("--tx",help="TX Frequency in kHz")
 parser.add_argument("--rx",help="RX Frequency in kHz")
+
+
 parser.add_argument("--sw1_rx",help="SW1 flag for the RX PLL IC")
 parser.add_argument("--sw2_rx",help="SW2 flag for the RX PLL IC")
-parser.add_argument("--sw1_tx",help="SW1 flag for the TX PLL IC, currently RF OUTPUT POWER SETTING (1:high, 0:low)")
+parser.add_argument("--sw1_tx",help="SW1 flag for the TX PLL IC, RF OUTPUT POWER SETTING for ITALTEL MB-45 (MC145156) (1:high, 0:low)")
 parser.add_argument("--sw2_tx",help="SW2 flag for the TX PLL IC")
+
+
+parser.add_argument("--txpower",help="RF OUTPUT POWER for MC-Compact (MC145158) (1:high, 0:low)")
+
 args = vars(parser.parse_args())
-
-
 ##
 #
 #	Wenn Parameter uebergeben wurden, werden diese natuerlich als neue Werte gesetzt
@@ -140,6 +166,8 @@ if args["sw1_tx"]:
 	params["sw1_tx"] = args["sw1_tx"]
 if args["sw2_tx"]:
 	params["sw2_tx"] = args["sw2_tx"]
+if args["txpower"]:
+	params["txpower"] = args["txpower"]
 ##
 #
 #	Hier werden die uebergebenen Werte in die benoetigten Datentypen gecastet
@@ -151,40 +179,87 @@ if args["sw2_tx"]:
 ##
 try:
 	rx = float(params["rx"])
-	SWrx = [int(params["sw1_rx"]),int(params["sw2_rx"])]
 	tx = float(params["tx"])
-	SWtx = [int(params["sw1_tx"]),int(params["sw2_tx"])]
+	if PLL_IC == "mc145156":
+		SWrx = [int(params["sw1_rx"]),int(params["sw2_rx"])]
+		SWtx = [int(params["sw1_tx"]),int(params["sw2_tx"])]
 except ValueError:
 	print ("Ungueltige werte uebergeben!!")
 	sys.exit(2)
-print("Setting TX Frequency to",tx)
-print("Setting RX Frequency to",rx)
-RXnval = calculateNval(rx+ZF,REF_PLL,PRESCALER)
-RXaval = calculateAval(rx+ZF,REF_PLL,PRESCALER)
-print("Sending RX QRG values to Radio (N:",RXnval,"A:",RXaval,")")
+print "Setting TX Frequency to",tx
+print "Setting RX Frequency to",rx
+
+if PLL_IC == "mc145158":
+	rxfreq = rx - ZF
+else:
+	rxfreq = rx + ZF
+RXnval = calculateNval(rxfreq,REF_PLL,PRESCALER)
+RXaval = calculateAval(rxfreq,REF_PLL,PRESCALER)
+print "Sending RX QRG values to Radio (N:",RXnval,"A:",RXaval,")"
 TXnval = calculateNval(tx,REF_PLL,PRESCALER)
 TXaval = calculateAval(tx,REF_PLL,PRESCALER)
-print("Sending TX QRG values to Radio (N:",TXnval,"A:",TXaval,")")
+print "Sending TX QRG values to Radio (N:",TXnval,"A:",TXaval,")"
 interface.setup() # Interface starten
-# SW1 und SW2 aussenden
-print("Setting SW1_RX to",SWrx[0])
-print("Setting SW2_RX to",SWrx[1])
-interface.sendout(SWrx)
+
+## Bei MC145158 noch die PLL-Referenzfrequenz setzen
+if PLL_IC=="mc145158":
+	RXrval = calculateRval(REF_PLL)
+	print "Sending out RX R-Value ",RXrval
+	interface.sendout(bitfield14(RXrval))
+	# Kontrollbit 1 gibt an, dass das Wort ins R Register geschrieben wird
+        interface.sendout([1])
+	interface.enableRX()
+
+if PLL_IC=="mc145156":
+	# Switches des RX PLLs werden gesetzt
+	# SW1 und SW2 aussenden
+	print "Setting SW1_RX to",SWrx[0]
+	print "Setting SW2_RX to",SWrx[1]
+	interface.sendout(SWrx)
+
 # Nval sind jeweils 10 Bit lang
 interface.sendout(bitfield10(RXnval))
 # Aval sind jeweils 7 Bit lang
 interface.sendout(bitfield7(RXaval))
+
+if PLL_IC=="mc145158":
+	# Kontrollbit 0 gibt an, dass das Wort ins N/A Register geschrieben wird
+	interface.sendout([0])
+
 # Uebertragung abgeschlossen, sende nun das Enable-Signal fuer die RX-QRG
 interface.enableRX()
-print("Setting SW1_TX to",SWtx[0])
-print("Setting SW2_TX to",SWtx[1])
-interface.sendout(SWtx)
+
+
+## Bei MC145158 noch die PLL-Referenzfrequenz setzen
+if PLL_IC=="mc145158":
+	TXrval = calculateRval(REF_PLL)
+	print "Sending out TX R-Value ",TXrval
+	interface.sendout(bitfield14(TXrval))
+	# Kontrollbit 1 gibt an, dass das Wort ins R Register geschrieben wird
+        interface.sendout([1])
+	interface.enableTX()
+
+if PLL_IC=="mc145156":
+	# Switches des TX PLLs werden gesetzt
+	print "Setting SW1_TX to",SWtx[0]
+	print "Setting SW2_TX to",SWtx[1]
+	interface.sendout(SWtx)
+
 interface.sendout(bitfield10(TXnval))
 interface.sendout(bitfield7(TXaval))
+if PLL_IC=="mc145158":
+	# es wird noch ein Kontrollbit benoetigt, welches angibt, in welches Register geschrieben wird
+	# 0: N/A Register, 1: R Register
+	interface.sendout([0])
+
 # Uebertragung abgeschlossen, sende nun das Enable-Signal fuer die TX-QRG
 interface.enableTX()
+
+print "Setting Transmit Power to "+params["txpower"]
+interface.setTXPower(int(params["txpower"]))
+
 # Wenn bis hierher alles ohne fehler durchgegangen ist, wurde die QRG gesetzt
-print("Done.")
+print "Done."
 
 f = open(QRGPARAMS,"w")
 f.write(json.JSONEncoder().encode(params))

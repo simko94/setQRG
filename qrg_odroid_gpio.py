@@ -32,8 +32,10 @@ DATA_PIN = 1
 CLK_PIN = 2
 ### ENB_RX OUT PIN NUMMER
 ENB_RX_PIN = 3
-###
+### ENB_TX OUT PIN NUMMER
 ENB_TX_PIN = 4
+### TX POWER PIN (0: low, 1:high)
+PWR_PIN = 5
 ### ENB-Flag Zeitspanne in Sekunden
 ENB_TIME = 0.05
 ### Taktzeit der seriellen Uebertragung, in Sekunden
@@ -49,6 +51,7 @@ def setup():
 	wiringpi.pinMode(CLK_PIN,1)	# Output fuer CLK
 	wiringpi.pinMode(ENB_RX_PIN,1)	# Output fuer ENB_RX
 	wiringpi.pinMode(ENB_TX_PIN,1)	# Output fuer ENB_TX
+	wiringpi.pinMode(PWR_PIN,1)	# Output fuer PWR_PIN
 	wiringpi.digitalWrite(ENB_RX_PIN,0)
 	wiringpi.digitalWrite(ENB_TX_PIN,0)
 	wiringpi.digitalWrite(CLK_PIN,0)
@@ -78,3 +81,5 @@ def enableTX():
 	wiringpi.digitalWrite(ENB_TX_PIN,0)
 
 
+def setTXPower(pwr):
+	wiringpi.digitalWrite(PWR_PIN, pwr)
